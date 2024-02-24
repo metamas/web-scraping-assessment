@@ -1,22 +1,28 @@
-import { Browser } from 'puppeteer';
+import { Page } from "puppeteer";
 
-async function amazonSignIn(browser: Browser, credentials: { username: string, password: string }) {
-  const page = await browser.newPage();
+async function amazonSignIn(page: Page, credentials: { username: string; password: string }) {
+  // Amazon does not allow directly navigating to the sign in page.
+  await page.goto("https://www.amazon.com");
+  // Sometimes Amazon returns an alternative landing page that requires an extra step
+  const isIntermediaryPage = await page.$("#navbar-backup-backup");
 
-  // Navigate to the Amazon sign in page
-  await page.goto('https://www.amazon.com');
-  // Hover the mouse over the "Hello, Sign in" link to reveal the sign in form
-  await page.waitForSelector('#nav-link-accountList', {visible: true});
-  await page.hover('#nav-link-accountList');
-  await page.waitForSelector('#nav-flyout-ya-signin', {visible: true});
-  await Promise.all([ page.waitForNavigation(), page.click('#nav-flyout-ya-signin') ]);
+  if (isIntermediaryPage) {
+    await page.waitForSelector(".nav-bb-right a");
+    await Promise.all([page.waitForNavigation(), page.click(".nav-bb-right a")]);
+  }
 
-  await page.waitForSelector('#ap_email');
-  await page.type('#ap_email', credentials.username);
-  await Promise.all([ page.waitForNavigation(), page.click('#continue') ]);
-  await page.waitForSelector('#ap_password');
-  await page.type('#ap_password', credentials.password);
-  await Promise.all([ page.waitForNavigation(), page.click('#signInSubmit') ]);
+  // Hover the mouse to reveal sign in form link
+  await page.waitForSelector("#nav-link-accountList", { visible: true });
+  await page.hover("#nav-link-accountList");
+  await page.waitForSelector("#nav-flyout-ya-signin", { visible: true });
+  await Promise.all([page.waitForNavigation(), page.click("#nav-flyout-ya-signin")]);
+
+  await page.waitForSelector("#ap_email");
+  await page.type("#ap_email", credentials.username);
+  await Promise.all([page.waitForNavigation(), page.click("#continue")]);
+  await page.waitForSelector("#ap_password");
+  await page.type("#ap_password", credentials.password);
+  await Promise.all([page.waitForNavigation(), page.click("#signInSubmit")]);
 
 
   // Successful sign in will redirect to the home page
