@@ -24,14 +24,17 @@ async function amazonSignIn(page: Page, credentials: { username: string; passwor
   await page.type("#ap_password", credentials.password);
   await Promise.all([page.waitForNavigation(), page.click("#signInSubmit")]);
 
+  if (page.url().includes("/ap/cvf")) {
+    console.log("Amazon requires further verification.");
+    console.log("You have 2 minutes to manually verify...");
+    await page.waitForNavigation({ timeout: 60000 * 2 });
+  }
 
   // Successful sign in will redirect to the home page
-  const isSignedIn = !page.url().includes('/ap/signin');
-
-  if (isSignedIn) {
-    console.log('Sign in successful');
+  if (!page.url().includes("/ap/signin")) {
+    console.log("Sign in successful");
   } else {
-    throw new Error('Sign in failed');
+    throw new Error("Sign in failed");
   }
 }
 
