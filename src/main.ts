@@ -11,7 +11,7 @@ async function main() {
 
   await amazonSignIn(page, credentials);
   const orders = await amazonOrders(page);
-  console.log({ orders });
+  console.dir({ count: orders.length, orders }, { depth: null, colors: true });
   await browser.close();
 }
 

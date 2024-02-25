@@ -42,52 +42,59 @@ async function amazonOrders(page: Page, count: number = 10) {
   // TODO: Compare element classes to /your-orders/orders
   await page.goto("https://www.amazon.com/gp/css/order-history");
 
-  // Expand time filter from last 30 days to the current year
-  // Finding the first available year option is more resilient than selecting by element index
-  const setTimeFilter = page.evaluate(() => {
-    const timeFilter = document.querySelector("#time-filter") as HTMLSelectElement;
-    const timeOptions = Array.from(timeFilter.options);
-    const currentYearOption = timeOptions.find((opt) => opt.value.includes("year"))?.value;
-
-    if (currentYearOption) {
-      timeFilter.value = currentYearOption;
-      // Trigger change event since setting value programmatically won't do it
-      timeFilter?.dispatchEvent(new Event("change", { bubbles: true }));
-    }
-  });
-
-  await Promise.all([page.waitForNavigation(), setTimeFilter]);
-  await page.waitForSelector(".order-card");
-
-  const orders = (await page.$$(".order-card")).slice(0, count);
+  let ordersData = [];
+  let yearOptions = await page.$$eval("#time-filter option", (options) =>
+    options.map((opt) => opt.value).filter((val) => val.startsWith("year-") || val === "archived")
+  );
   const orderInfoRegex = /order placed (.+?) total (\$\d+\.\d{2}) ship to (.+)/i;
 
-  const ordersData = await Promise.all(
-    orders.map(async (order) => {
-      const orderInfoTxt = await order.$eval(".order-info .a-col-left", (el) => el.textContent);
-      const orderInfoMatch = orderInfoTxt?.trim().replace(/\s+/g, " ").match(orderInfoRegex);
+  for (const yearValue of yearOptions) {
+    if (ordersData.length >= count) break;
 
-      const date = orderInfoMatch?.[1] ?? "not found";
-      const price = orderInfoMatch?.[2] ?? "not found";
-      const recipient = orderInfoMatch?.[3] ?? "not found";
+    // Select a year and wait for the page reload with those orders
+    await Promise.all([page.waitForNavigation(), page.select("#time-filter", yearValue)]);
 
-      const items = await order.$$eval(".shipment", (els) => {
-        return els.map((el) => ({
-          link: el.querySelector(".a-link-normal")?.getAttribute("href"),
-          name: el.querySelector(".a-link-normal")?.textContent?.trim(),
-        }));
-      });
+    // Handle potential pagination within each year of orders
+    let hasNextPage = true;
+    while (hasNextPage && ordersData.length < count) {
+      if (ordersData.length >= count) break;
+      const orders = await page.$$(".order-card");
 
-      return {
-        date,
-        price,
-        recipient,
-        items,
-      };
-    })
-  );
+      for (const order of orders) {
+        if (ordersData.length >= count) break;
 
-  return ordersData;
+        const orderInfoTxt = await order.$eval(".order-info .a-col-left", (el) => el.textContent);
+        const orderInfoMatch = orderInfoTxt?.trim().replace(/\s+/g, " ").match(orderInfoRegex);
+
+        const date = orderInfoMatch?.[1] ?? "not found";
+        const price = orderInfoMatch?.[2] ?? "not found";
+        const recipient = orderInfoMatch?.[3] ?? "not found";
+
+        const items = await order.$$eval(".shipment", (els) => {
+          return els.map((el) => ({
+            link: el.querySelector(".a-link-normal")?.getAttribute("href"),
+            name: el.querySelector(".a-link-normal")?.textContent?.trim(),
+          }));
+        });
+
+        ordersData.push({
+          date,
+          price,
+          recipient,
+          items,
+        });
+      }
+
+      // Check for enabled "Next" button to determine further pagination
+      hasNextPage = (await page.$(".a-pagination .a-last a")) !== null;
+
+      if (hasNextPage) {
+        await Promise.all([page.waitForNavigation(), page.click(".a-pagination .a-last a")]);
+      }
+    }
+  }
+
+  return ordersData.slice(0, count);
 }
 
 export { amazonSignIn, amazonOrders };
