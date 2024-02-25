@@ -1,7 +1,7 @@
 import puppeteer from "puppeteer";
 
 import promptForCredentials from "./prompt.js";
-import amazonSignIn from "./auth.js";
+import { amazonSignIn, amazonOrders } from "./amazon.js";
 
 async function main() {
   const credentials = await promptForCredentials("Amazon");
@@ -10,6 +10,8 @@ async function main() {
   const page = (await browser.pages())[0];
 
   await amazonSignIn(page, credentials);
+  const orders = await amazonOrders(page);
+  console.log({ orders });
   await browser.close();
 }
 
