@@ -116,4 +116,74 @@ async function amazonOrderHistory(browser: Browser, limit: number = 10): Promise
   return ordersData.slice(0, limit) as OrderData[];
 }
 
-export { amazonSignIn, amazonOrderHistory };
+async function amazonOrderSearch(browser: Browser, searches: string[]): Promise<OrderData[]> {
+  const searchPage = await browser.newPage();
+  await searchPage.goto(ORDERS_URL, { waitUntil: "domcontentloaded" });
+
+  let orderLinks = [];
+  for (const search of searches) {
+    await searchPage.waitForSelector("#searchOrdersInput");
+    // Clear the search input and type the new search term
+    await searchPage.click("#searchOrdersInput", { clickCount: 3 });
+    await searchPage.keyboard.press("Backspace");
+    await searchPage.type("#searchOrdersInput", search);
+    await Promise.all([searchPage.waitForNavigation(), searchPage.click(".a-button-search input")]);
+
+    let hasNextPage = true;
+    while (hasNextPage) {
+      const someOrderLinks = await searchPage.$$eval(
+        "#ordersContainer .a-fixed-left-grid .a-col-right .a-row:nth-child(1) a",
+        (els, url) => els.map((el) => url + el.getAttribute("href")),
+        BASE_URL
+      );
+
+      orderLinks.push(...someOrderLinks);
+      hasNextPage = (await searchPage.$(".a-pagination .a-last a")) !== null;
+
+      if (hasNextPage) {
+        await Promise.all([searchPage.waitForNavigation(), searchPage.click(".a-pagination .a-last a")]);
+      }
+    }
+  }
+  await searchPage.close();
+
+  const orderInfoRegex = /order placed (.+?) total (\$\d+\.\d{2}) ship to (.+)/i;
+  // Must navigate to each order page to retrieve price information
+  // TODO: Add batch processing to avoid opening too many pages at once
+  // TODO: Deduplicate order links by order ID
+  const ordersData = orderLinks.map(async (link) => {
+    const orderPage = await browser.newPage();
+    await orderPage.goto(link, { waitUntil: "domcontentloaded" });
+
+    const orderInfoTxt = await orderPage.$eval(".order-info .a-col-left", (el) => el.textContent);
+    const orderInfoMatch = orderInfoTxt?.trim().replace(/\s+/g, " ").match(orderInfoRegex);
+
+    const date = orderInfoMatch?.[1] ?? "not found";
+    const price = orderInfoMatch?.[2] ?? "not found";
+    const recipient = orderInfoMatch?.[3] ?? "not found";
+
+    const items = await orderPage.$$eval(
+      ".shipment",
+      (els, url) => {
+        return els.map((el) => ({
+          link: url + el.querySelector(".yohtmlc-item .a-link-normal")?.getAttribute("href"),
+          name: el.querySelector(".yohtmlc-item .a-link-normal")?.textContent?.trim(),
+        }));
+      },
+      BASE_URL
+    );
+
+    await orderPage.close();
+
+    return {
+      date,
+      price,
+      recipient,
+      items,
+    };
+  });
+
+  return Promise.all(ordersData);
+}
+
+export { amazonSignIn, amazonOrderHistory, amazonOrderSearch };
