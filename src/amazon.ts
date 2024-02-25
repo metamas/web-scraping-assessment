@@ -1,8 +1,22 @@
-import { Page } from "puppeteer";
+import { Browser } from "puppeteer";
 
-async function amazonSignIn(page: Page, credentials: { username: string; password: string }) {
+const BASE_URL = "https://www.amazon.com";
+const ORDERS_URL = BASE_URL + "/your-orders/orders";
+
+export type OrderData = {
+  date: string;
+  price: string;
+  recipient: string;
+  items: {
+    link: string | null | undefined;
+    name: string | undefined;
+  }[];
+};
+
+async function amazonSignIn(browser: Browser, credentials: { username: string; password: string }) {
+  const page = (await browser.pages())[0];
   // Amazon does not allow directly navigating to the sign in page.
-  await page.goto("https://www.amazon.com");
+  await page.goto(BASE_URL);
   // Sometimes Amazon returns an alternative landing page that requires an extra step
   const isIntermediaryPage = await page.$("#navbar-backup-backup");
 
@@ -12,6 +26,7 @@ async function amazonSignIn(page: Page, credentials: { username: string; passwor
   }
 
   // Hover the mouse to reveal sign in form link
+  // TODO: Handle occasional captcha page
   await page.waitForSelector("#nav-link-accountList", { visible: true });
   await page.hover("#nav-link-accountList");
   await page.waitForSelector("#nav-flyout-ya-signin", { visible: true });
@@ -38,9 +53,9 @@ async function amazonSignIn(page: Page, credentials: { username: string; passwor
   }
 }
 
-async function amazonOrders(page: Page, count: number = 10) {
-  // TODO: Compare element classes to /your-orders/orders
-  await page.goto("https://www.amazon.com/gp/css/order-history");
+async function amazonOrderHistory(browser: Browser, limit: number = 10): Promise<OrderData[]> {
+  const page = (await browser.pages())[0];
+  await page.goto(ORDERS_URL, { waitUntil: "domcontentloaded" });
 
   let ordersData = [];
   let yearOptions = await page.$$eval("#time-filter option", (options) =>
@@ -49,19 +64,19 @@ async function amazonOrders(page: Page, count: number = 10) {
   const orderInfoRegex = /order placed (.+?) total (\$\d+\.\d{2}) ship to (.+)/i;
 
   for (const yearValue of yearOptions) {
-    if (ordersData.length >= count) break;
+    if (ordersData.length >= limit) break;
 
     // Select a year and wait for the page reload with those orders
     await Promise.all([page.waitForNavigation(), page.select("#time-filter", yearValue)]);
 
     // Handle potential pagination within each year of orders
     let hasNextPage = true;
-    while (hasNextPage && ordersData.length < count) {
-      if (ordersData.length >= count) break;
+    while (hasNextPage && ordersData.length < limit) {
+      if (ordersData.length >= limit) break;
       const orders = await page.$$(".order-card");
 
       for (const order of orders) {
-        if (ordersData.length >= count) break;
+        if (ordersData.length >= limit) break;
 
         const orderInfoTxt = await order.$eval(".order-info .a-col-left", (el) => el.textContent);
         const orderInfoMatch = orderInfoTxt?.trim().replace(/\s+/g, " ").match(orderInfoRegex);
@@ -70,12 +85,16 @@ async function amazonOrders(page: Page, count: number = 10) {
         const price = orderInfoMatch?.[2] ?? "not found";
         const recipient = orderInfoMatch?.[3] ?? "not found";
 
-        const items = await order.$$eval(".shipment", (els) => {
-          return els.map((el) => ({
-            link: el.querySelector(".a-link-normal")?.getAttribute("href"),
-            name: el.querySelector(".a-link-normal")?.textContent?.trim(),
-          }));
-        });
+        const items = await order.$$eval(
+          ".shipment",
+          (els, url) => {
+            return els.map((el) => ({
+              link: url + el.querySelector(".yohtmlc-item .a-link-normal")?.getAttribute("href"),
+              name: el.querySelector(".yohtmlc-item .a-link-normal")?.textContent?.trim(),
+            }));
+          },
+          BASE_URL
+        );
 
         ordersData.push({
           date,
@@ -94,7 +113,7 @@ async function amazonOrders(page: Page, count: number = 10) {
     }
   }
 
-  return ordersData.slice(0, count);
+  return ordersData.slice(0, limit) as OrderData[];
 }
 
-export { amazonSignIn, amazonOrders };
+export { amazonSignIn, amazonOrderHistory };
