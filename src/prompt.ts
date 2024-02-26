@@ -5,12 +5,12 @@ async function promptForCredentials(websiteName: string): Promise<{ username: st
     {
       type: "input",
       name: "username",
-      message: `Enter your ${websiteName} username:`,
+      message: `Enter your ${websiteName} username/email:`,
       validate: function (value: string) {
         if (value.length) {
           return true;
         } else {
-          return `Please enter your ${websiteName} username.`;
+          return `Please enter your ${websiteName} username/email.`;
         }
       },
     },
