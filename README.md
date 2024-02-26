@@ -42,8 +42,10 @@ Were this a paid/production project, the following would be my next steps:
 2. Add a thorough set of feature tests
 3. Deduplicate search results orders where multiple matched items are from the same order.
 4. Add some performance-based batch limit processing when launching many "order details" pages simultaneously
-5. Add option to limit the total (or individual) search results
-6. Add option to use a `.env` to configure login credentials
-7. Add option to save results to a JSON file
-8. Add further user input validation (e.g. email format)
-9. Add option to retrieve orders from a specific date range
+5. Troubleshoot cases when order data is "not foun", but expected
+  - This may be isolated to Whole Foods grocery orders
+6. Add option to limit the total (or individual) search results
+7. Add option to use a `.env` to configure login credentials
+8. Add option to save results to a JSON file
+9. Add further user input validation (e.g. email format)
+10. Add option to retrieve orders from a specific date range
