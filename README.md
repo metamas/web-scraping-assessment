@@ -5,7 +5,7 @@ See the [assessment requirments](https://docs.google.com/document/d/1BvYEldLzFIK
 ## Insrtuctions
 
 1. Install dependencies (`npm install`)
-2. Compile the program (`npm build`)
+2. Compile the program (`npm run build`)
 3. Run the program (`npm start`)
 
 ## Overview
