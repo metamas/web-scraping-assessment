@@ -47,7 +47,7 @@ async function amazonSignIn(browser: Browser, credentials: { username: string; p
 
   // Successful sign in will redirect to the home page
   if (!page.url().includes("/ap/signin")) {
-    console.log("Sign in successful");
+    console.log("  Sign in successful");
   } else {
     throw new Error("Sign in failed");
   }
