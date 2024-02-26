@@ -2,6 +2,9 @@
   "name": "web-scraping-assessment",
   "version": "1.0.0",
   "description": "",
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
   "type": "module",
   "main": "index.js",
   "scripts": {
@@ -9,9 +12,9 @@
     "start": "node dist/main.js",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
-  "keywords": [],
-  "author": "",
-  "license": "ISC",
+  "engines": {
+    "node": ">=20.11.0"
+  },
   "devDependencies": {
     "@types/inquirer": "^9.0.7",
     "typescript": "^5.3.3"

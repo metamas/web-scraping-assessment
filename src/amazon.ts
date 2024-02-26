@@ -82,7 +82,7 @@ async function parseOrderItems(el: Page | ElementHandle): Promise<{ link: string
     },
     BASE_URL
   );
-  // TODO: Go to each item's link to retrieve individual item prices
+  // TODO: Go to each order's invoice to retrieve individual item prices
 }
 
 async function amazonOrderHistory(browser: Browser, limit: number = 10): Promise<OrderData[]> {
