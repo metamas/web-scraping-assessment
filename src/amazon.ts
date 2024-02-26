@@ -19,14 +19,21 @@ async function amazonSignIn(browser: Browser, credentials: { username: string; p
   await page.goto(BASE_URL);
   // Sometimes Amazon returns an alternative landing page that requires an extra step
   const isIntermediaryPage = await page.$("#navbar-backup-backup");
+  // Sometimes Amazon requires a CAPTCHA verification, but it's inconsistent/rare
+  const isCaptchaPage = await page.$("#captchacharacters");
 
   if (isIntermediaryPage) {
     await page.waitForSelector(".nav-bb-right a");
     await Promise.all([page.waitForNavigation(), page.click(".nav-bb-right a")]);
   }
 
+  if (isCaptchaPage) {
+    console.log("Amazon requires further verification.");
+    console.log("You have 2 minutes to manually verify...");
+    await page.waitForNavigation({ timeout: 60000 * 2 });
+  }
+
   // Hover the mouse to reveal sign in form link
-  // TODO: Handle occasional captcha page
   await page.waitForSelector("#nav-link-accountList", { visible: true });
   await page.hover("#nav-link-accountList");
   await page.waitForSelector("#nav-flyout-ya-signin", { visible: true });
