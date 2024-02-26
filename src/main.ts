@@ -13,8 +13,17 @@ async function main() {
   const credentials = await promptForCredentials("Amazon");
   // Use headful mode in case manual MFA is required
   const browser = await puppeteer.launch({ headless: false, defaultViewport: null });
-  await amazonSignIn(browser, credentials);
 
+  // Sign in flow
+  try {
+    await amazonSignIn(browser, credentials);
+  } catch (error) {
+    console.error("  Sign in failed. Exiting...");
+    await browser.close();
+    return;
+  }
+
+  // Retrieve or search for orders
   do {
     const action = await promptForAction();
     let orders: OrderData[] = [];
