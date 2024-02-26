@@ -1,4 +1,4 @@
-import { Browser } from "puppeteer";
+import { Browser, Page, ElementHandle } from "puppeteer";
 
 const BASE_URL = "https://www.amazon.com";
 const ORDERS_URL = BASE_URL + "/your-orders/orders";
@@ -8,8 +8,8 @@ export type OrderData = {
   price: string;
   recipient: string;
   items: {
-    link: string | null | undefined;
-    name: string | undefined;
+    link: string | null;
+    name: string | null;
   }[];
 };
 
@@ -53,15 +53,39 @@ async function amazonSignIn(browser: Browser, credentials: { username: string; p
   }
 }
 
+function parseOrderInfo(orderInfoTxt: string): { date: string; price: string; recipient: string } {
+  const orderInfoRegex = /order placed (.+?) total (\$\d+\.\d{2}) ship to (.+)/i;
+  const orderInfoMatch = orderInfoTxt?.trim().replace(/\s+/g, " ").match(orderInfoRegex);
+
+  return {
+    date: orderInfoMatch?.[1] ?? "not found",
+    price: orderInfoMatch?.[2] ?? "not found",
+    recipient: orderInfoMatch?.[3] ?? "not found",
+  };
+}
+
+async function parseOrderItems(el: Page | ElementHandle): Promise<{ link: string | null; name: string | null }[]> {
+  return el.$$eval(
+    ".shipment",
+    (els, url) => {
+      return els.map((el) => ({
+        link: url + el.querySelector(".yohtmlc-item .a-link-normal")?.getAttribute("href") ?? null,
+        name: el.querySelector(".yohtmlc-item .a-link-normal")?.textContent?.trim() ?? null,
+      }));
+    },
+    BASE_URL
+  );
+  // TODO: Go to each item's link to retrieve individual item prices
+}
+
 async function amazonOrderHistory(browser: Browser, limit: number = 10): Promise<OrderData[]> {
-  const page = (await browser.pages())[0];
+  const page = await browser.newPage();
   await page.goto(ORDERS_URL, { waitUntil: "domcontentloaded" });
 
   let ordersData = [];
   let yearOptions = await page.$$eval("#time-filter option", (options) =>
     options.map((opt) => opt.value).filter((val) => val.startsWith("year-") || val === "archived")
   );
-  const orderInfoRegex = /order placed (.+?) total (\$\d+\.\d{2}) ship to (.+)/i;
 
   for (const yearValue of yearOptions) {
     if (ordersData.length >= limit) break;
@@ -78,23 +102,9 @@ async function amazonOrderHistory(browser: Browser, limit: number = 10): Promise
       for (const order of orders) {
         if (ordersData.length >= limit) break;
 
-        const orderInfoTxt = await order.$eval(".order-info .a-col-left", (el) => el.textContent);
-        const orderInfoMatch = orderInfoTxt?.trim().replace(/\s+/g, " ").match(orderInfoRegex);
-
-        const date = orderInfoMatch?.[1] ?? "not found";
-        const price = orderInfoMatch?.[2] ?? "not found";
-        const recipient = orderInfoMatch?.[3] ?? "not found";
-
-        const items = await order.$$eval(
-          ".shipment",
-          (els, url) => {
-            return els.map((el) => ({
-              link: url + el.querySelector(".yohtmlc-item .a-link-normal")?.getAttribute("href"),
-              name: el.querySelector(".yohtmlc-item .a-link-normal")?.textContent?.trim(),
-            }));
-          },
-          BASE_URL
-        );
+        const orderInfoTxt = await order.$eval(".order-info .a-col-left", (el) => el.textContent ?? "");
+        const { date, price, recipient } = parseOrderInfo(orderInfoTxt);
+        const items = await parseOrderItems(order);
 
         ordersData.push({
           date,
@@ -113,6 +123,7 @@ async function amazonOrderHistory(browser: Browser, limit: number = 10): Promise
     }
   }
 
+  await page.close();
   return ordersData.slice(0, limit) as OrderData[];
 }
 
@@ -147,31 +158,16 @@ async function amazonOrderSearch(browser: Browser, searches: string[]): Promise<
   }
   await searchPage.close();
 
-  const orderInfoRegex = /order placed (.+?) total (\$\d+\.\d{2}) ship to (.+)/i;
-  // Must navigate to each order page to retrieve price information
-  // TODO: Add batch processing to avoid opening too many pages at once
+  // Go to each order page to retrieve order details
+  // TODO: Add conditional batch processing to avoid opening too many pages at once
   // TODO: Deduplicate order links by order ID
   const ordersData = orderLinks.map(async (link) => {
     const orderPage = await browser.newPage();
     await orderPage.goto(link, { waitUntil: "domcontentloaded" });
 
-    const orderInfoTxt = await orderPage.$eval(".order-info .a-col-left", (el) => el.textContent);
-    const orderInfoMatch = orderInfoTxt?.trim().replace(/\s+/g, " ").match(orderInfoRegex);
-
-    const date = orderInfoMatch?.[1] ?? "not found";
-    const price = orderInfoMatch?.[2] ?? "not found";
-    const recipient = orderInfoMatch?.[3] ?? "not found";
-
-    const items = await orderPage.$$eval(
-      ".shipment",
-      (els, url) => {
-        return els.map((el) => ({
-          link: url + el.querySelector(".yohtmlc-item .a-link-normal")?.getAttribute("href"),
-          name: el.querySelector(".yohtmlc-item .a-link-normal")?.textContent?.trim(),
-        }));
-      },
-      BASE_URL
-    );
+    const orderInfoTxt = await orderPage.$eval(".order-info .a-col-left", (el) => el.textContent ?? "");
+    const { date, price, recipient } = parseOrderInfo(orderInfoTxt);
+    const items = await parseOrderItems(orderPage);
 
     await orderPage.close();
 
