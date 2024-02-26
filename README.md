@@ -12,7 +12,7 @@ See the [assessment requirments](https://docs.google.com/document/d/1BvYEldLzFIK
 
 This project is a CLI that automates the gathering of the user's Amazon order history data. The user is prompted to enter their Amazon credentials, and then given the options to either retrieve their most recent order history or retrieve orders that match specific search strings. A looping dialogue allows the user to continue retrieve/search order data until they choose to exit.
 
-_An diolague CLI design was chose because the requirements imply the user's presence to manually handle MFA scenarios._
+_The diolague CLI design was chose because the requirements imply the user's presence to manually handle MFA scenarios._
 
 ### Sign-in
 
@@ -32,7 +32,7 @@ Amazon's order history is based around "orders", that is a single purchase insta
 
 It would require a further step of loading the order invoices and parsing the item-price pairs to retrieve the individual item prices. In the case of search results, item prices would further need to be filtered from the order invoice data to only include item prices from the search results.
 
-I chose to stop my scraping at the order level and include the total order price along with a list of the item descriptions and their page links. For an assessment project, I felt that this was a reasonable stopping point that still sufficiently my abilities.
+_I chose to stop the scraping at the order level and include the total order price along with a list of item descriptions and page links. For an assessment project, I felt that was a reasonable stopping point that sufficiently demonastrated my abilities while meeting the rough requirments provided._
 
 ## Next Steps
 
